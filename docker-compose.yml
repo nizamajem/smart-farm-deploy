@@ -13,6 +13,10 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SEED_DEMO: ${SEED_DEMO:-false}
+      HA_BASE_URL: ${HA_BASE_URL:-}
+      HA_TOKEN: ${HA_TOKEN:-}
+      HA_SYNC_INTERVAL_SEC: ${HA_SYNC_INTERVAL_SEC:-300}
+      HA_SYNC_ENABLED: ${HA_SYNC_ENABLED:-true}
     volumes:
       - backend-data:/app/data
     expose:

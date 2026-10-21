@@ -187,7 +187,6 @@ print_access() {
 # ---------------------------------------------------------------- perintah
 
 deploy() {
-  self_update "$@"
   ensure_env
 
   if [ -z "$SKIP_PULL" ]; then
@@ -217,6 +216,8 @@ deploy() {
   print_access
 }
 
+# Perbarui skrip ini dulu agar perbaikan terbaru langsung dipakai
+[ "$CMD" = deploy ] && self_update "$@"
 ensure_tools
 case "$CMD" in
   deploy)   deploy "$@" ;;

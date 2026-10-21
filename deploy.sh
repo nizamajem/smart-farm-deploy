@@ -251,10 +251,20 @@ deploy() {
   log "Menjalankan / me-restart container (PM2 di dalamnya)"
   dc pull -q --ignore-buildable 2>/dev/null || warn "Gagal menarik image Caddy/cloudflared terbaru, memakai yang ada"
   dc up -d --remove-orphans
-  # Caddyfile di-mount sebagai file: perubahan isinya tidak membuat container dibuat ulang, jadi reload manual.
-  # (reload di tempat, tanpa restart, agar jaringan cloudflared yang menumpang di Caddy tidak putus)
+  # Perubahan Caddyfile tidak membuat container dibuat ulang, jadi reload manual
+  # (di tempat, tanpa restart, agar jaringan cloudflared yang menumpang di Caddy tidak putus)
   dc exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
     || warn "Gagal reload konfigurasi Caddy"
+  # Bila Caddy sempat dibuat ulang, cloudflared masih menumpang di jaringan container lama: sambungkan ulang
+  if [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
+    local caddy_id net
+    caddy_id=$("${DOCKER[@]}" inspect -f '{{.Id}}' "$(dc ps -q caddy)")
+    net=$("${DOCKER[@]}" inspect -f '{{.HostConfig.NetworkMode}}' "$(dc ps -q cloudflared)" 2>/dev/null || true)
+    if [ "$net" != "container:$caddy_id" ]; then
+      log "Menyambungkan ulang Cloudflare Tunnel ke Caddy"
+      dc up -d --force-recreate --no-deps cloudflared
+    fi
+  fi
 
   log "Health check"
   wait_healthy

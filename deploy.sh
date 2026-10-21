@@ -220,7 +220,7 @@ print_access() {
   echo "   Web         : $url"
   echo "   API         : $url/api   (pakai untuk mobile: --dart-define=API_URL=$url/api)"
   if [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
-    echo "   Publik      : lewat Cloudflare Tunnel → Public Hostname harus mengarah ke service HTTP  caddy:80"
+    echo "   Publik      : lewat Cloudflare Tunnel → Service URL di dashboard: http://localhost:8080 (http, bukan https)"
   fi
   if [ -n "${NEW_ADMIN_PASSWORD:-}" ]; then
     echo "   Admin awal  : ${ADMIN_EMAIL} / ${NEW_ADMIN_PASSWORD}   ← simpan! (juga tersimpan di .env)"

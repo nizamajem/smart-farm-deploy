@@ -53,11 +53,13 @@ services:
       - frontend
 
   # Cloudflare Tunnel — hanya aktif bila CLOUDFLARE_TUNNEL_TOKEN diisi (deploy.sh menyalakan profile "tunnel").
-  # Di dashboard Cloudflare, Public Hostname harus mengarah ke service HTTP: caddy:80
+  # Berbagi jaringan dengan Caddy, jadi Service URL di dashboard boleh
+  # http://localhost:8080, http://localhost:80, atau http://caddy:80 (selalu http, bukan https).
   cloudflared:
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]
     restart: unless-stopped
+    network_mode: "service:caddy"
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}

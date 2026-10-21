@@ -47,7 +47,7 @@ Token disimpan di `.env` (tidak di-commit) dan service `cloudflared` berjalan se
 (`restart: unless-stopped`, ikut menyala saat server boot).
 
 Di **Cloudflare Zero Trust → Networks → Tunnels → (tunnel Anda) → Public Hostname**, arahkan hostname ke
-**Type: HTTP**, **URL: `caddy:80`** (bukan `localhost`, karena cloudflared berada di jaringan Docker).
+**Type: HTTP**, **URL: `http://localhost:8080`** (atau `http://caddy:80`). Selalu `http`, jangan `https`.
 Biarkan `SITE_ADDRESS=:80`; HTTPS ditangani Cloudflare.
 
 ## Update

@@ -1,4 +1,5 @@
-{$SITE_ADDRESS} {
+# :8080 = pintu masuk tambahan untuk Cloudflare Tunnel (nilai default dashboard: http://localhost:8080)
+{$SITE_ADDRESS}, :8080 {
 	encode gzip
 
 	handle /api/* {

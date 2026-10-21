@@ -9,6 +9,7 @@
 #   ./deploy.sh rollback   kembali ke image sebelum deploy terakhir
 #   ./deploy.sh down       hentikan semua container (data tetap aman di volume)
 #   ./deploy.sh tunnel [TOKEN]  simpan token Cloudflare Tunnel ke .env lalu deploy
+#   ./deploy.sh env        terapkan KEY=VALUE dari gist sekali pakai "smart-farm-env" ke .env lalu deploy
 #
 # Opsi: --no-cache (build ulang penuh), --skip-pull (pakai kode yang sudah ada)
 set -Eeuo pipefail
@@ -108,6 +109,30 @@ ensure_env() {
     DC+=(--profile tunnel)
     TUNNEL_PROFILE_ADDED=1
   fi
+}
+
+ENV_GIST_DESC=smart-farm-env
+
+# Rahasia (token HA, dll.) dikirim dari PC lewat secret gist berisi baris KEY=VALUE, lalu gist dihapus.
+apply_env_gist() {
+  command -v gh >/dev/null || die "gh belum terpasang (sudo apt install -y gh && gh auth login)"
+  local gist line key value n=0
+  gist=$(gh gist list --limit 100 2>/dev/null | awk -F'\t' -v d="$ENV_GIST_DESC" '$2==d {print $1; exit}') || true
+  [ -n "$gist" ] || die "Gist \"$ENV_GIST_DESC\" tidak ditemukan"
+  [ -f .env ] || cp .env.example .env
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    [[ "$line" =~ ^([A-Z_][A-Z0-9_]*)=(.*)$ ]] || continue
+    key=${BASH_REMATCH[1]}; value=${BASH_REMATCH[2]}
+    [[ "$value" != *"|"* ]] || die "Nilai $key tidak boleh mengandung |"
+    if grep -qE "^$key=" .env; then sed -i "s|^$key=.*|$key=$value|" .env; else echo "$key=$value" >> .env; fi
+    echo "   $key diperbarui"
+    n=$((n + 1))
+  done < <(gh gist view "$gist" --raw --filename env.txt)
+  (( n > 0 )) || die "Gist tidak berisi baris KEY=VALUE"
+  { gh gist delete "$gist" --yes 2>/dev/null || gh gist delete "$gist"; } \
+    && echo "   gist sudah dihapus" \
+    || warn "Gist $gist gagal dihapus, hapus manual: gh gist delete $gist"
 }
 
 TOKEN_GIST_DESC=smart-farm-tunnel-token
@@ -275,11 +300,12 @@ deploy() {
 }
 
 # Perbarui skrip ini dulu agar perbaikan terbaru langsung dipakai
-case "$CMD" in deploy|tunnel) self_update "$@" ;; esac
+case "$CMD" in deploy|tunnel|env) self_update "$@" ;; esac
 ensure_tools
 case "$CMD" in
   deploy)   deploy "$@" ;;
   tunnel)   set_tunnel_token; deploy "$@" ;;
+  env)      log "Menerapkan konfigurasi dari gist"; apply_env_gist; deploy "$@" ;;
   status)   ensure_env; show_status ;;
   logs)     ensure_env; dc logs -f --tail 100 ;;
   restart)  ensure_env; for s in "${SERVICES[@]}"; do dc exec -T "$s" pm2 restart all; done; wait_healthy ;;

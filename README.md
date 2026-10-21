@@ -69,6 +69,7 @@ Setelah push ke repo backend/frontend, cukup jalankan lagi:
 | `./deploy.sh rollback` | Kembali ke image sebelum deploy terakhir |
 | `./deploy.sh down` | Hentikan semua (data tetap di volume) |
 | `./deploy.sh tunnel [TOKEN]` | Simpan token Cloudflare Tunnel lalu deploy |
+| `./deploy.sh env` | Terapkan `KEY=VALUE` dari secret gist sekali pakai `smart-farm-env` (berkas `env.txt`) ke `.env`, hapus gist, lalu deploy |
 | `./deploy.sh --no-cache` | Deploy dengan build ulang penuh |
 | `./deploy.sh --skip-pull` | Deploy tanpa git pull |
 

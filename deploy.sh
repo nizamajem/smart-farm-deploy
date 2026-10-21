@@ -45,10 +45,17 @@ ensure_tools() {
     log "Memasang git"
     sudo_if_needed apt-get update -qq && sudo_if_needed apt-get install -y -qq git
   }
-  if ! command -v docker >/dev/null; then
-    log "Docker belum ada — memasang lewat get.docker.com"
-    curl -fsSL https://get.docker.com | sudo_if_needed sh
+  if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1 && ! sudo_if_needed docker compose version >/dev/null 2>&1; then
+    log "Memasang Docker + Compose"
+    # Paket Ubuntu dulu (mendukung rilis terbaru), fallback ke skrip resmi Docker
+    if ! { sudo_if_needed apt-get update -qq && sudo_if_needed apt-get install -y -qq docker.io docker-compose-v2; }; then
+      curl -fsSL https://get.docker.com | sudo_if_needed sh
+    fi
     sudo_if_needed systemctl enable --now docker || true
+    if [ "$(id -u)" -ne 0 ]; then
+      sudo usermod -aG docker "$(whoami)" || true
+      warn "$(whoami) ditambahkan ke grup docker (berlaku setelah login ulang); deploy kali ini memakai sudo."
+    fi
   fi
   if docker compose version >/dev/null 2>&1; then
     DC=(docker compose)

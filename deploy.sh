@@ -45,25 +45,30 @@ ensure_tools() {
     log "Memasang git"
     sudo_if_needed apt-get update -qq && sudo_if_needed apt-get install -y -qq git
   }
-  if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1 && ! sudo_if_needed docker compose version >/dev/null 2>&1; then
+  if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
     log "Memasang Docker + Compose"
     # Paket Ubuntu dulu (mendukung rilis terbaru), fallback ke skrip resmi Docker
-    if ! { sudo_if_needed apt-get update -qq && sudo_if_needed apt-get install -y -qq docker.io docker-compose-v2; }; then
+    if ! { sudo_if_needed apt-get update -qq && sudo_if_needed apt-get install -y -qq docker.io docker-compose-v2 docker-buildx; }; then
       curl -fsSL https://get.docker.com | sudo_if_needed sh
     fi
     sudo_if_needed systemctl enable --now docker || true
-    if [ "$(id -u)" -ne 0 ]; then
-      sudo usermod -aG docker "$(whoami)" || true
-      warn "$(whoami) ditambahkan ke grup docker (berlaku setelah login ulang); deploy kali ini memakai sudo."
-    fi
   fi
-  if docker compose version >/dev/null 2>&1; then
+  if ! docker buildx version >/dev/null 2>&1; then
+    log "Memasang docker-buildx"
+    sudo_if_needed apt-get install -y -qq docker-buildx || warn "docker-buildx gagal dipasang; build memakai builder lama"
+  fi
+  if [ "$(id -u)" -ne 0 ] && ! id -nG | grep -qw docker; then
+    sudo usermod -aG docker "$(whoami)" || true
+  fi
+
+  # `docker compose version` tidak menyentuh daemon; `docker info` memastikan izin akses socket.
+  if docker info >/dev/null 2>&1; then
     DC=(docker compose)
-  elif sudo_if_needed docker compose version >/dev/null 2>&1; then
-    warn "User $(whoami) belum di grup docker; memakai sudo. (sudo usermod -aG docker $(whoami) lalu login ulang)"
+  elif sudo_if_needed docker info >/dev/null 2>&1; then
+    warn "$(whoami) belum aktif di grup docker (login ulang untuk tanpa sudo); kali ini memakai sudo."
     DC=(sudo docker compose)
   else
-    die "Docker Compose v2 tidak ditemukan. Pasang plugin docker-compose-plugin."
+    die "Docker daemon tidak berjalan. Cek: sudo systemctl status docker"
   fi
   DOCKER=("${DC[@]:0:${#DC[@]}-1}")   # "docker" atau "sudo docker"
 }

@@ -8,6 +8,7 @@
 #   ./deploy.sh backup     backup database sekarang
 #   ./deploy.sh rollback   kembali ke image sebelum deploy terakhir
 #   ./deploy.sh down       hentikan semua container (data tetap aman di volume)
+#   ./deploy.sh tunnel [TOKEN]  simpan token Cloudflare Tunnel ke .env lalu deploy
 #
 # Opsi: --no-cache (build ulang penuh), --skip-pull (pakai kode yang sudah ada)
 set -Eeuo pipefail
@@ -23,18 +24,20 @@ warn() { printf '%s[!] %s%s\n' "$c_yellow" "$*" "$c_off"; }
 die()  { printf '%s[x] %s%s\n' "$c_red" "$*" "$c_off" >&2; exit 1; }
 trap 'die "Gagal di baris $LINENO: $BASH_COMMAND"' ERR
 
-CMD=deploy
+CMD=
+CMD_ARG=
 NO_CACHE=
 SKIP_PULL=
 for arg in "$@"; do
   case "$arg" in
     --no-cache) NO_CACHE=--no-cache ;;
     --skip-pull) SKIP_PULL=1 ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     -*) die "Opsi tidak dikenal: $arg" ;;
-    *) CMD=$arg ;;
+    *) if [ -z "$CMD" ]; then CMD=$arg; else CMD_ARG=$arg; fi ;;
   esac
 done
+CMD=${CMD:-deploy}
 
 # ---------------------------------------------------------------- prasyarat
 
@@ -100,6 +103,28 @@ ensure_env() {
   set -a; . ./.env; set +a
   : "${BACKEND_REPO:?BACKEND_REPO belum diisi di .env}" "${FRONTEND_REPO:?FRONTEND_REPO belum diisi di .env}"
   BRANCH=${BRANCH:-main}
+  # Service cloudflared hanya ikut berjalan bila token tunnel diisi
+  if [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ] && [ -z "${TUNNEL_PROFILE_ADDED:-}" ]; then
+    DC+=(--profile tunnel)
+    TUNNEL_PROFILE_ADDED=1
+  fi
+}
+
+set_tunnel_token() {
+  local token=$CMD_ARG
+  if [ -z "$token" ]; then
+    read -rsp "Tempel token Cloudflare Tunnel: " token; echo
+  fi
+  token=${token##*service install }   # boleh tempel seluruh perintah "cloudflared service install <token>"
+  token=$(printf '%s' "$token" | tr -d '[:space:]')
+  [[ "$token" =~ ^[A-Za-z0-9+/=_-]{50,}$ ]] || die "Token tidak valid"
+  [ -f .env ] || cp .env.example .env
+  if grep -qE '^CLOUDFLARE_TUNNEL_TOKEN=' .env; then
+    sed -i "s|^CLOUDFLARE_TUNNEL_TOKEN=.*|CLOUDFLARE_TUNNEL_TOKEN=$token|" .env
+  else
+    printf '\nCLOUDFLARE_TUNNEL_TOKEN=%s\n' "$token" >> .env
+  fi
+  log "Token Cloudflare Tunnel disimpan di .env"
 }
 
 # ---------------------------------------------------------------- git
@@ -179,6 +204,9 @@ print_access() {
   log "Selesai! Smart Farm berjalan"
   echo "   Web         : $url"
   echo "   API         : $url/api   (pakai untuk mobile: --dart-define=API_URL=$url/api)"
+  if [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
+    echo "   Publik      : lewat Cloudflare Tunnel → Public Hostname harus mengarah ke service HTTP  caddy:80"
+  fi
   if [ -n "${NEW_ADMIN_PASSWORD:-}" ]; then
     echo "   Admin awal  : ${ADMIN_EMAIL} / ${NEW_ADMIN_PASSWORD}   ← simpan! (juga tersimpan di .env)"
   fi
@@ -206,6 +234,7 @@ deploy() {
   dc run --rm --no-deps -T backend npm run -s migration:run:prod
 
   log "Menjalankan / me-restart container (PM2 di dalamnya)"
+  dc pull -q --ignore-buildable 2>/dev/null || warn "Gagal menarik image Caddy/cloudflared terbaru, memakai yang ada"
   dc up -d --remove-orphans
 
   log "Health check"
@@ -217,10 +246,11 @@ deploy() {
 }
 
 # Perbarui skrip ini dulu agar perbaikan terbaru langsung dipakai
-[ "$CMD" = deploy ] && self_update "$@"
+case "$CMD" in deploy|tunnel) self_update "$@" ;; esac
 ensure_tools
 case "$CMD" in
   deploy)   deploy "$@" ;;
+  tunnel)   set_tunnel_token; deploy "$@" ;;
   status)   ensure_env; show_status ;;
   logs)     ensure_env; dc logs -f --tail 100 ;;
   restart)  ensure_env; for s in "${SERVICES[@]}"; do dc exec -T "$s" pm2 restart all; done; wait_healthy ;;

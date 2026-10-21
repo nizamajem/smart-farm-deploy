@@ -37,6 +37,19 @@ Skrip akan otomatis:
 Untuk domain + HTTPS otomatis, sebelum deploy ubah `.env`: `SITE_ADDRESS=farm.domainanda.com`
 (arahkan DNS A-record ke IP server, buka port 80 & 443).
 
+## Cloudflare Tunnel (akses publik tanpa buka port)
+
+```bash
+./deploy.sh tunnel            # lalu tempel token (atau seluruh perintah "cloudflared service install ...")
+```
+
+Token disimpan di `.env` (tidak di-commit) dan service `cloudflared` berjalan sebagai container
+(`restart: unless-stopped`, ikut menyala saat server boot).
+
+Di **Cloudflare Zero Trust → Networks → Tunnels → (tunnel Anda) → Public Hostname**, arahkan hostname ke
+**Type: HTTP**, **URL: `caddy:80`** (bukan `localhost`, karena cloudflared berada di jaringan Docker).
+Biarkan `SITE_ADDRESS=:80`; HTTPS ditangani Cloudflare.
+
 ## Update
 
 Setelah push ke repo backend/frontend, cukup jalankan lagi:
@@ -55,6 +68,7 @@ Setelah push ke repo backend/frontend, cukup jalankan lagi:
 | `./deploy.sh backup` | Backup database sekarang |
 | `./deploy.sh rollback` | Kembali ke image sebelum deploy terakhir |
 | `./deploy.sh down` | Hentikan semua (data tetap di volume) |
+| `./deploy.sh tunnel [TOKEN]` | Simpan token Cloudflare Tunnel lalu deploy |
 | `./deploy.sh --no-cache` | Deploy dengan build ulang penuh |
 | `./deploy.sh --skip-pull` | Deploy tanpa git pull |
 

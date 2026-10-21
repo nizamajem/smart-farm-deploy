@@ -110,8 +110,18 @@ ensure_env() {
   fi
 }
 
+TOKEN_GIST_DESC=smart-farm-tunnel-token
+
 set_tunnel_token() {
-  local token=$CMD_ARG
+  local token=$CMD_ARG gist=
+  # Tanpa argumen: ambil dari secret gist sekali pakai (dibuat dari PC dengan gh), lalu gist dihapus.
+  if [ -z "$token" ] && command -v gh >/dev/null; then
+    gist=$(gh gist list --limit 100 2>/dev/null | awk -F'\t' -v d="$TOKEN_GIST_DESC" '$2==d {print $1; exit}') || true
+    if [ -n "$gist" ]; then
+      log "Mengambil token dari gist sekali pakai"
+      token=$(gh gist view "$gist" --raw --filename tunnel-token.txt)
+    fi
+  fi
   if [ -z "$token" ]; then
     read -rsp "Tempel token Cloudflare Tunnel: " token; echo
   fi
@@ -125,6 +135,11 @@ set_tunnel_token() {
     printf '\nCLOUDFLARE_TUNNEL_TOKEN=%s\n' "$token" >> .env
   fi
   log "Token Cloudflare Tunnel disimpan di .env"
+  if [ -n "$gist" ]; then
+    { gh gist delete "$gist" --yes 2>/dev/null || gh gist delete "$gist"; } \
+      && echo "   gist token sudah dihapus" \
+      || warn "Gist $gist gagal dihapus, hapus manual: gh gist delete $gist"
+  fi
 }
 
 # ---------------------------------------------------------------- git

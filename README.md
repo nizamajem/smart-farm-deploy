@@ -40,7 +40,7 @@ Untuk domain + HTTPS otomatis, sebelum deploy ubah `.env`: `SITE_ADDRESS=farm.do
 ## Cloudflare Tunnel (akses publik tanpa buka port)
 
 ```bash
-./deploy.sh tunnel            # lalu tempel token (atau seluruh perintah "cloudflared service install ...")
+./deploy.sh tunnel            # ambil token dari gist "smart-farm-tunnel-token" (lalu gist dihapus), atau tempel manual
 ```
 
 Token disimpan di `.env` (tidak di-commit) dan service `cloudflared` berjalan sebagai container

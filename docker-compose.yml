@@ -6,6 +6,8 @@ services:
     image: smartfarm-backend:latest
     restart: unless-stopped
     environment:
+      # Zona waktu untuk ringkasan harian log aktivitas
+      TZ: ${TZ:-Asia/Makassar}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET wajib diisi di .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       CORS_ORIGINS: ${CORS_ORIGINS:-}

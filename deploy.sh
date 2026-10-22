@@ -96,6 +96,16 @@ ensure_env() {
   fi
   chmod 600 .env
   if ! grep -qE '^JWT_SECRET=.+' .env; then set_env JWT_SECRET "$(rand 32)"; fi
+  # MQTT: alamat LAN server untuk tim HW & password akun pemantau
+  if ! grep -qE '^MQTT_PUBLIC_HOST=.+' .env; then
+    local lan; lan=$(hostname -I 2>/dev/null | awk '{print $1}')
+    [ -n "$lan" ] && set_env MQTT_PUBLIC_HOST "$lan"
+  fi
+  # .env lama (sebelum fitur MQTT) belum punya baris ini
+  grep -qE '^MQTT_ADMIN_USERNAME=' .env || printf '\nMQTT_ADMIN_USERNAME=hwteam\n' >> .env
+  if grep -qE '^MQTT_ADMIN_USERNAME=.+' .env && ! grep -qE '^MQTT_ADMIN_PASSWORD=.+' .env; then
+    set_env MQTT_ADMIN_PASSWORD "$(rand 12)"
+  fi
   if ! grep -qE '^ADMIN_PASSWORD=.+' .env && grep -qE '^ADMIN_EMAIL=.+' .env; then
     local pw; pw=$(rand 8)
     set_env ADMIN_PASSWORD "$pw"
@@ -246,6 +256,10 @@ print_access() {
   echo "   API         : $url/api   (pakai untuk mobile: --dart-define=API_URL=$url/api)"
   if [ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]; then
     echo "   Publik      : lewat Cloudflare Tunnel → Service URL di dashboard: http://localhost:8080 (http, bukan https)"
+  fi
+  if [ "${MQTT_ENABLED:-true}" != "false" ]; then
+    echo "   MQTT        : mqtt://${MQTT_PUBLIC_HOST:-<ip-server>}:${MQTT_TCP_PORT:-1883} (LAN) · wss://<domain>/api/mqtt"
+    echo "                 kredensial per perangkat: web → perangkat → Pengaturan · status: web → Integrasi"
   fi
   if [ -n "${NEW_ADMIN_PASSWORD:-}" ]; then
     echo "   Admin awal  : ${ADMIN_EMAIL} / ${NEW_ADMIN_PASSWORD}   ← simpan! (juga tersimpan di .env)"
